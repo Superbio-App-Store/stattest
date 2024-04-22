@@ -1,0 +1,5 @@
+# app requirements
+pandas
+numpy
+scipy
+matplotlib
