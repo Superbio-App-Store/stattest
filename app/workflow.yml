@@ -1,0 +1,22 @@
+name: Hypothesis Testing Suite
+
+stages:
+    run_tests: {file: 'application.py'}
+      
+input_settings:
+    data: {title: 'Input Data', type: 'table', demo_path: 'apps/cxr/resources/mtcars.csv', demo_description: 'Demo data for cars', url: 'https://www.kaggle.com/datasets/lavanya321/mtcars'}
+
+
+parameters:
+    job_id: {type: 'str'}
+    sample1: {type: 'str', default: '', user_defined: 'True', from_data: 'True', tooltip: 'Sample'}
+    sample2: {type: 'str', default: '', user_defined: 'True', from_data: 'True', tooltip: 'Paired Sample'}
+    missing_treatment: {type: 'str', default: 'drop', user_defined: 'True', tooltip: 'Missing data treatment'}
+    distribution: {type: 'str', default: 'non-parametric', user_defined: 'True', tooltip: 'Distribution to assume'}
+    alternative: {type: 'str', default: 'two-sided', user_defined: 'True', tooltip: 'Alternative hypothesis'}
+    confidence: {type: 'float', default: 0.95, user_defined: 'True', min_value: 0.9, max_value: 0.999, increment: 0.001}
+    output_folder: {type: 'path', default: 'output/'}
+      
+  
+output_settings:
+    xxx

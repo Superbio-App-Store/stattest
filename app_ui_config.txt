@@ -1,0 +1,141 @@
+{
+   "file_settings": [
+      {
+         "allowed_extensions": [
+            "csv"
+         ],
+         "data_structure_description": "Data should be in csv format. Each column is a variable, and each row an observation.",
+         "demo_data_details": {
+            "description": "Data obtained from Applying the AFRAID and FRIGHT Clocks to Novel Preclinical Mouse Models of Polypharmacy. It computes the AFRAID-clock which measures the expected lifespan for lab mice.",
+            "file_name": "demo_data.csv",
+            "file_path": "apps/sb_automl_training/resources_regression/demo_data_reg.csv",
+            "file_sources": [
+               {
+                  "title": "Data Source",
+                  "url": "https://pubmed.ncbi.nlm.nih.gov/35313348/"
+               }
+            ],
+            "preview_file_name": "apps/sb_automl_training/resources_regression/demo_data_reg.csv"
+         },
+         "disabled": false,
+         "name": "data",
+         "optional": false,
+         "supports_preview": true,
+         "title": "Data",
+         "upload_types": [
+            "local",
+            "remote"
+         ]
+      }
+   ],
+   "output_settings": {
+      "description": "Plots and tables are provided below detailing descriptive statistics and hypothesis test results."
+   },
+   "parameter_settings": {
+      "inputs_require_files": [
+         "sample1","sample2"
+      ],
+      "parameters": [
+         {
+            "default_value": "Target",
+            "disabled": false,
+            "field_name": "sample1",
+            "input_type": "dropdown",
+            "options": [
+               {
+                  "label": "Sample Column",
+                  "value": "Target"
+               }
+            ],
+            "title": "Sample Column",
+            "tooltip": "Choose variable/column you want to predict."
+         },{
+            "default_value": "Target",
+            "disabled": false,
+            "field_name": "sample2",
+            "input_type": "dropdown",
+            "options": [
+               {
+                  "label": "Paired Sample Column",
+                  "value": "Target"
+               }
+            ],
+            "title": "Paired Sample Column",
+            "tooltip": "Choose variable/column you want to predict."
+         },
+         {
+            "default_value": "drop",
+            "disabled": false,
+            "field_name": "missing_treatment",
+            "input_type": "dropdown",
+            "options": [
+               {
+                  "label": "Drop missing samples",
+                  "value": "drop"
+               },
+               {
+                  "label": "Impute missing samples with column mean",
+                  "value": "mean"
+               },
+               {
+                  "label": "Forward fill missing samples with previous value",
+                  "value": "ffill"
+               }
+            ],
+            "title": "Missing Data Treatment",
+            "tooltip": "Choose how to handle missing and non-numeric data"
+         },{
+            "default_value": "non-parametric",
+            "disabled": false,
+            "field_name": "distribution",
+            "input_type": "dropdown",
+            "options": [
+               {
+                  "label": "Non-Parametric",
+                  "value": "non-parametric"
+               },
+               {
+                  "label": "Normal Distribution",
+                  "value": "normal"
+               }
+            ],
+            "title": "Type of Test",
+            "tooltip": "Choose type of test to run (based on expected distribution)"
+         },{
+            "default_value": "two-sided",
+            "disabled": false,
+            "field_name": "alternative",
+            "input_type": "dropdown",
+            "options": [
+               {
+                  "label": "The two samples are not equivalent (non-directional).",
+                  "value": "two-sided"
+               },
+               {
+                  "label": "Sample 1 is greater than sample 2 with respect to tests",
+                  "value": "greater"
+               },
+               {
+                  "label": "Sample 1 is less than sample 2 with respect to tests",
+                  "value": "lesser"
+               }
+            ],
+            "title": "Alternative Hypothesis",
+            "tooltip": "What alternative hypothesis (samples are not equivalent) to test null hypothesis (samples are equivalent) against "
+         },
+         {
+            "default_value": 0.950,
+            "field_name": "confidence",
+            "increment": 0.001,
+            "input_type": "slider",
+            "max_value": 0.999,
+            "max_value_included": true,
+            "min_value": 0.900,
+            "min_value_inclusive": true,
+            "title": "Confidence Level",
+            "tooltip": "Confidence level required to reject null hypothesis (e.g. a 95% confidence level corresponds to a 5% p-value)",
+            "type": "float"
+         }
+      ]
+   }
+}

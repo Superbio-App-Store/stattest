@@ -29,6 +29,7 @@ RUN mkdir -p /data/
 
 COPY application.py .
 
-EXPOSE 8000
+#EXPOSE 8000
+#ENTRYPOINT ["python","application.py"]
 
-ENTRYPOINT ["python","application.py"]
+ENTRYPOINT python /app/app_runner.py ${JOB_ID}

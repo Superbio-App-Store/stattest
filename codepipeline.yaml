@@ -1,0 +1,348 @@
+AWSTemplateFormatVersion: 2010-09-09
+Parameters:
+######## Codepipeline parameters ########
+  AppUser:
+    Type: String
+    Default: "${AppUser}"
+
+  AppUserPassword:
+    Type: String
+    Default: "${AppUserPassword}"
+  NewToken:
+    Type: String
+    Default: "${NewToken}"
+  
+  ImageNameCpu:
+    Type: String
+    Default: "${IMAGE_NAME_CPU}"
+
+  Provider:
+    Default: CodeStarSourceConnection
+    Type: String
+
+  ProviderRepo:
+    Type: String
+    Default: stattest
+    Description: This Parameter is going to be used to get the source from github and also as the endpoint from API.
+
+  ProviderBranch:
+    Type: String
+    Default: main
+    
+  ProviderOwner:
+    Type: String
+    Default: Superbio-App-Store
+
+  ProviderConnectionArn:
+    Default: arn:aws:codestar-connections:us-west-2:221497708189:connection/954d5498-2afa-4b5b-8493-1d1c1b92eebf
+    Type: String
+
+  FolderName: 
+    Type: String
+    Default: Docker/
+    Description: We need to set Default with the same value used as the folder name that hold the Dockerfile in github. If in root directory leave blank, otherwise include "/".
+  
+  DockerfileNameCpu:
+    Type: String
+    Default: Dockerfile
+    Description: We need to set Default the same name of Dockerfile that is on the github repository
+
+  AppName:
+    Type: String
+    Default: stattest
+    Description: This parameter is going to be used on pipeline name, ECR and the image name as well.
+
+  SecretProviderArn:
+    Default: arn:aws:secretsmanager:us-west-2:221497708189:secret:APPUserStaging-qvBuN6
+    Type: String
+    Description: This parameter is used for create the conection bettween codepipeline and variables from secret manager
+
+  SecretEnvironment:
+    Type: String
+    Default: Staging
+    AllowedValues:
+      - "Staging"
+      - "Prod"
+      - "Dev"
+    Description: Here we choose the environment used to request the email and password to generate the token
+  
+  ApiEnvironment:
+    Type: String
+    Description: "This parameter is going to be used by the codebuild send request to API"
+    AllowedValues:
+      - "test.superbio.ai:446"
+      - "stagingapi.superbio.ai:448"
+      - "api.superbio.ai"
+    Default: "stagingapi.superbio.ai:448"
+    ConstraintDescription: "Must be one of theses"
+
+  S3bucketName:
+    Type: String
+    Default: appstore-source
+
+  S3BucketArn:
+    Type: String
+    Default: arn:aws:s3:::appstore-source
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+    - Label:
+        default: Codepipeline General Params
+      Parameters:
+        - ProviderOwner
+        - Provider
+        - ProviderRepo
+        - ProviderBranch
+        - ProviderToken
+
+    - Label:
+        default: Pipeline Name General Params
+      Parameters:
+        - PipelineName
+
+Resources:
+  # ArtifactBucket:
+  #   Type: AWS::S3::Bucket
+  #   Properties: 
+  #     BucketName: appstore-source
+
+  RepositoryCPU:
+    Type: AWS::ECR::Repository
+    Properties: 
+      RepositoryName: !Sub ${AppName}-cpu
+
+  CodeBuildServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub cb-${AWS::StackName}
+      Path: /
+      AssumeRolePolicyDocument: |
+        {
+          "Statement": [{
+            "Effect": "Allow",
+            "Principal": { "Service": [ "codebuild.amazonaws.com" ]},
+            "Action": [ "sts:AssumeRole" ]
+          }]
+        }
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+      Policies:
+        - PolicyName: infra-services
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Resource: !Sub 'arn:aws:iam::${AWS::AccountId}:*'
+                Effect: Allow
+                Action:
+                  - iam:PassRole
+              - Resource: "*"
+                Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+              - Resource: !Sub ${S3BucketArn}/*
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:GetObjectVersion
+              - Resource: 
+                  - !Sub arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:repository/${RepositoryCPU}
+                Effect: Allow
+                Action:
+                  - ecr:GetAuthorizationToken
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:GetRepositoryPolicy
+                  - ecr:DescribeRepositories
+                  - ecr:ListImages
+                  - ecr:DescribeImages
+                  - ecr:BatchGetImage
+                  - ecr:ListTagsForResource
+                  - ecr:DescribeImageScanFindings
+                  - ecr:InitiateLayerUpload
+                  - ecr:UploadLayerPart
+                  - ecr:CompleteLayerUpload
+                  - ecr:PutImage
+              - Resource: !Ref SecretProviderArn
+                Effect: Allow
+                Action:
+                  - secretsmanager:GetResourcePolicy
+                  - secretsmanager:GetSecretValue
+                  - secretsmanager:DescribeSecret
+                  - secretsmanager:ListSecretVersionIds
+
+  CodePipelineServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub cp-${AWS::StackName}
+      Path: /
+      AssumeRolePolicyDocument: |
+        {
+          "Statement": [{
+            "Effect": "Allow",
+            "Principal": { "Service": [ "codepipeline.amazonaws.com" ]},
+            "Action": [ "sts:AssumeRole" ]
+          }]
+        }
+      Policies:
+        - PolicyName: infra-services
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Resource: !Sub 'arn:aws:iam::${AWS::AccountId}:*'
+                Effect: Allow
+                Action:
+                  - iam:PassRole
+              - Resource: !Sub 'arn:aws:s3:::*'
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+                  - s3:GetObjectVersioning
+                  - s3:PutObject
+              - Resource: '*'
+                Effect: Allow
+                Action:
+                  - codestar-connections:UseConnection
+              - Resource: !Sub 'arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:*'
+                Effect: Allow
+                Action:
+                  - codebuild:StartBuild
+                  - codebuild:BatchGetBuilds
+              - Resource: !Sub 'arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:*'
+                Effect: Allow
+                Action:
+                  - cloudformation:CreateStack
+                  - cloudformation:DeleteStack
+                  - cloudformation:DescribeStacks
+                  - cloudformation:UpdateStack
+                  - cloudformation:CreateChangeSet
+                  - cloudformation:ExecuteChangeSet
+                  - cloudformation:DeleteChangeSet
+                  - cloudformation:DescribeChangeSet
+                  - cloudformation:SetStackPolicy
+                  - cloudformation:ValidateTemplate
+
+  CodeBuildProjectCPU:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub ${AWS::StackName}-cpu
+      ServiceRole: !Ref CodeBuildServiceRole
+      Artifacts:
+        Location: !Ref S3bucketName
+        Type: "S3"
+      Source:
+        Location: !Sub ${S3bucketName}/source.zip
+        Type: "S3"
+        BuildSpec: !Sub |
+          version: 0.2
+          env:
+            secrets-manager:
+              AppUser: "$SECRET_ID:APP_USER"
+              AppUserPassword: "$SECRET_ID:APP_USER_PASSWORD"
+          phases:
+            install:
+              commands:
+                - echo install step
+                - COMMIT_HASH=$(echo `date +%s` | cut -c 1-7)
+                - IMAGE_TAG=$COMMIT_HASH
+            pre_build:
+              commands: 
+                - echo Logging in to Amazon ECR...
+                - aws ecr get-login-password | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+                - docker pull $REPOSITORY_CPU_URI:latest || true
+            build:
+              commands:
+                - echo Building the Docker image...
+                - docker build -f $DOCKERFILE_CPU_NAME --cache-from $REPOSITORY_CPU_URI:latest --tag $REPOSITORY_CPU_URI:$IMAGE_TAG .
+                - docker tag $REPOSITORY_CPU_URI:$IMAGE_TAG $REPOSITORY_CPU_URI:latest
+            post_build:
+              commands:
+                - echo Pushing the Docker image...
+                - docker push $REPOSITORY_CPU_URI:$IMAGE_TAG
+                - docker push $REPOSITORY_CPU_URI:latest
+                - response=$(curl -X POST -H "Content-Type:application/json" -d '{"email":"'"${AppUser}"'", "password":"'"${AppUserPassword}"'"}' https://${ApiEnvironment}/login)
+                - jsonstring=$(echo $response | jq -c . | tr -d '\n')
+                - NewToken=$(echo $jsonstring| jq -r '.access_token')
+                - curl -X PATCH -H "Content-Type:application/json" -H "Authorization:Bearer ${NewToken}" -d '{"sbio_github_repo":"https://github.com/Superbio-App-Store/${ProviderRepo}", "ecs_task_name":"'"${ImageNameCpu}"'"}' https://${ApiEnvironment}/api/apps/aws_update_image
+                - printf '{"tag":"%s:%s"}' "$REPOSITORY_CPU_URI" "$IMAGE_TAG" > /tmp/build-cpu.json
+          artifacts:
+            files: 
+              - /tmp/build-cpu.json
+            discard-paths: yes
+      Environment:
+        ComputeType: "BUILD_GENERAL1_LARGE"
+        Image: "aws/codebuild/standard:5.0"
+        Type: "LINUX_CONTAINER"
+        PrivilegedMode: true
+        EnvironmentVariables:
+          - Name: AWS_DEFAULT_REGION
+            Value: !Ref AWS::Region
+          - Name: AWS_ACCOUNT_ID
+            Value: !Ref AWS::AccountId
+          - Name: FOLDER_NAME
+            Value: !Ref FolderName
+          - Name: DOCKERFILE_CPU_NAME
+            Value: !Ref DockerfileNameCpu
+          - Name: REPOSITORY_CPU_URI
+            Value: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${RepositoryCPU}
+          - Name: SECRET_ID
+            Value: !Sub APPUser${SecretEnvironment}
+          - Name: IMAGE_NAME_CPU
+            Value: !Ref RepositoryCPU
+            
+  Pipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      Name: !Sub Pipeline-${AppName}-cpu-${SecretEnvironment}
+      RoleArn: !GetAtt CodePipelineServiceRole.Arn
+      ArtifactStore:
+        Type: S3
+        Location: !Ref S3bucketName
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: App
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Version: '1'
+                Provider: !Ref Provider
+              Configuration:
+                ConnectionArn: !Ref ProviderConnectionArn
+                BranchName: !Ref ProviderBranch
+                FullRepositoryId: !Join ["/", [!Ref "ProviderOwner", !Ref "ProviderRepo"]]
+                DetectChanges: true
+              OutputArtifacts:
+                - Name: App
+              RunOrder: 1
+            
+        - Name: Build
+          Actions:
+            - Name: Build-CPU
+              ActionTypeId:
+                  Category: Build
+                  Owner: AWS
+                  Version: '1'
+                  Provider: CodeBuild
+              Configuration:
+                  ProjectName: !Ref CodeBuildProjectCPU
+                  PrimarySource: App
+              InputArtifacts:
+                  - Name: App
+              OutputArtifacts:
+                  - Name: Build-CPU-Output
+              RunOrder: 2
+            
+
+# Outputs:
+#   PipelineUrl:
+#     Value: !Sub https://console.aws.amazon.com/codepipeline/home?region=${AWS::Region}#/view/${Pipeline}
+
+  # CodePipeline:
+  #   Value: !Ref Pipeline
+  #   Export:
+  #     Name: !Sub ${PipelineName}CodePipeline

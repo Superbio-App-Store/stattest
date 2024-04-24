@@ -17,9 +17,19 @@ def generate_histograms(array, column, bins = 20, output = "/output/"):
     ax2.bar(x, res.cumcount, width=res.binsize)
     ax2.set_title('Cumulative histogram')
     ax2.set_xlim([x.min(), x.max()])
-    plt.savefig(output + 'histogram_{column}.png')
+    plt.savefig(output + f'histogram_{column}.png')
+    return output + f'histogram_{column}.png'
     
-    
+
+def calc_mode(data, column):
+    mode_list = data[column].mode()
+    if len(mode_list) == 1:
+        mode_out = mode_list[0]
+    else:
+        mode_out = np.NaN
+    return mode_out
+        
+        
 def generate_summary_stats(data, s1, s2 = None, missing_treatment = 'drop', output = "/output/"):
     
     metadata = {}
@@ -41,10 +51,11 @@ def generate_summary_stats(data, s1, s2 = None, missing_treatment = 'drop', outp
         
     # lower, upper quartiles, median, mode
     range1 = np.quantile(group1, [0,0.25,0.5,0.75,1])
-    mode1 = data[s1].mode
+    mode1 = calc_mode(data, s1)
+
     if s2 != None:
         range2 = np.quantile(group1, [0,0.25,0.5,0.75,1])
-        mode2 = data[s2].mode
+        mode2 = calc_mode(data, s2)
     
     # Table1: Observations, Missing, Mean, Mode, Variance, Stdev, Skewness, Kurtosis
     input_metrics1 = [metadata['nobs'], missing1, str((missing1/metadata['nobs'])*100)+"%", descriptive1[2], mode1, descriptive1[3], descriptive1[3]**(0.5), descriptive1[4], descriptive1[5]]
@@ -53,26 +64,36 @@ def generate_summary_stats(data, s1, s2 = None, missing_treatment = 'drop', outp
     else:
         input_metrics2 = [metadata['nobs'], missing2, str((missing2/metadata['nobs'])*100)+"%", descriptive2[2], mode2, descriptive2[3], descriptive2[3]**(0.5), descriptive2[4], descriptive2[5]]
         Table1 = pd.DataFrame([input_metrics1,input_metrics2], columns = ['Observations','Missing Count','Missing Percent','Mean','Mode','Variance','Standard Deviation','Skewness','Kurtosis'], index = [s1,s2]).T
-    Table1.to_csv(output + 'Descriptive Statistics.csv')
-    
+    Table1.to_csv(output + 'Descriptive_Statistics.csv')
+    stat_tables_out =  [{'file': output + 'Descriptive_Statistics.csv',
+                         'title': 'Descriptive Statistics'}]
+      
     # Table2: Min, Lower Quartile, Median, Upper Quartile, Max
     if s2 == None:    
         Table2 = pd.DataFrame(range1, index = ['Min','Lower Quartile','Median','Upper Quartile','Max'], columns = [s1])
     else:
         Table2 = pd.DataFrame([range1,range2], columns = ['Min','Lower Quartile','Median','Upper Quartile','Max'], index = [s1,s2]).T
-    Table2.to_csv(output + 'Range Statistics.csv')
+    Table2.to_csv(output + 'Range_Statistics.csv')
+    stat_tables_out.append({'file': output + 'Range_Statistics.csv',
+                         'title': 'Range Statistics'})
     
     # Box plot of group1 and group2
     if s2 == None:
         plt.boxplot(group1, vert=True, labels=[s1])
-        plt.savefig(output + 'boxplot_{s1}.png')
+        plt.savefig(output + 'boxplots.png')
     else:
         plt.boxplot([group1,group2], vert=True, labels=[s1,s2])
         plt.savefig(output + 'boxplots.png')
+    stat_plots_out = [{'file': output + 'boxplots.png',
+                       'title': 'Boxplots'}]
     
     # Frequency stats
-    generate_histograms(group1, s1, bins = 20, output = "/output/")
+    title = generate_histograms(group1, s1, bins = 20, output = output)
+    stat_plots_out.append({'file': title,
+                       'title': "Histograms (Sample 1)"})
     if s2 != None:
-        generate_histograms(group2, s2, bins = 20, output = "/output/")
+        title = generate_histograms(group2, s2, bins = 20, output = output)
+        stat_plots_out.append({'file': title,
+                           'title': "Histograms (Sample 2)"})
         
-    return group1, group2, metadata
+    return group1, group2, metadata, stat_tables_out, stat_plots_out
