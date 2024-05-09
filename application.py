@@ -1,16 +1,18 @@
 import argparse
-import pandas as pd
-import logging
 import json
 
-from app.summary_stats import generate_summary_stats
-from app.stat_tests import run_normal_tests, run_nonparametric_tests, run_mean_tests, run_association_tests
-from app.common_functions import generate_output_json
+from summary_stats import generate_summary_stats
+from stat_tests import run_normal_tests, run_nonparametric_tests, run_mean_tests, run_association_tests
+from common_functions import load_data, generate_output_json
+from report import generate_pdf
+import os
+from os.path import exists
+from custom_logging import send_log
+import sys
+
 
 if __name__ == "__main__":
-    
-    import os
-        
+     
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "-d", "--data", help="Name of file uploaded to container, which contains data", type=str, required=True, default='data.csv'
@@ -33,41 +35,52 @@ if __name__ == "__main__":
     parser.add_argument(
         "-c", "--confidence", help="Confidence-level", type=float, required=False, default=0.95
     )
-    parser.add_argument(
-        "-o", "--output_folder", help="Output directory for model, predictions and fit metrics", type=str, required=False, default='output/'
-    )
-    args = parser.parse_args()
+    args, _ = parser.parse_known_args()
     
-    output_dir = '/data/' + args.output_folder
-    if not os.path.exists(output_dir):
-        # Create the directory
-        os.makedirs(output_dir)
-    
-    #data is mount point
-    data = pd.read_csv('/data/' + args.data)
-    
-    group1, group2, metadata, stat_tables_out, stat_plots_out = generate_summary_stats(data = data, s1 = args.sample1, s2 = args.sample2, missing_treatment = args.missing_treatment, output = output_dir)
-    print("Summary stats generated")
-    
-    norm_table_out = run_normal_tests(group1, group2, s1 = args.sample1, s2 = args.sample2, alternative = args.alternative, output = output_dir)
-    print("Normal tests run")
-
-    npara_table_out = run_nonparametric_tests(group1, group2, s1 = args.sample1, s2 = args.sample2, alternative = args.alternative, output = output_dir)
-    print("Non-parametric tests run")
-    
-    mean_table_out = run_mean_tests(group1, group2, s1 = args.sample1, s2 = args.sample2, alternative = args.alternative, output = output_dir)
-    print("Mean tests run")
-    
-    assoc_table_out = run_association_tests(group1, group2, s1 = args.sample1, s2 = args.sample2, alternative = args.alternative, distribution = args.distribution, output = output_dir)
-    print("Association tests run")
-    
-    response_dict = generate_output_json(stat_tables_out, stat_plots_out, norm_table_out, npara_table_out, mean_table_out, assoc_table_out)
-    
-    json_string = json.dumps(response_dict)  # Optional: specify indentation
     os.chdir("/")
-    with open("'/app/results_for_payload.json'", "w") as outfile:
-        outfile.write(json_string)
-    with open("'/app/results_for_upload.json'", "w") as outfile:
-        outfile.write(json_string)
+    send_log(f"About to load data from source file path {args.data}")
+    data = load_data(args.data, '/data')
+    if data.shape[0]<10:
+        send_log("Data appears to contain less than 10 records (Or a data processing error has occurred)")
+        sys.exit(1)
     
-    print(os.listdir(args.output))
+    send_log(f"Data shape: {data.shape}")
+    send_log(f"Data columns: {data.columns}")
+    
+    try:
+        group1, group2, metadata, stat_tables_out, stat_plots_out, files_for_upload, tests_list = generate_summary_stats(data = data, s1 = args.sample1, s2 = args.sample2, missing_treatment = args.missing_treatment)
+        send_log("Summary stats generated")
+    except:
+        sys.exit(1)
+    
+    norm_table_out, norm_file, norm_list = run_normal_tests(group1, group2, s1 = args.sample1, s2 = args.sample2, confidence = args.confidence, alternative = args.alternative)
+    files_for_upload.append(norm_file)
+    send_log("Norm tests run")
+    
+    npara_table_out, npara_file, npara_list = run_nonparametric_tests(group1, group2, s1 = args.sample1, s2 = args.sample2, confidence = args.confidence, alternative = args.alternative)
+    files_for_upload.append(npara_file)
+    send_log("Non-parametric tests run")
+    
+    mean_table_out, mean_file, mean_list = run_mean_tests(group1, group2, s1 = args.sample1, s2 = args.sample2, confidence = args.confidence, alternative = args.alternative)
+    files_for_upload.append(mean_file)
+    send_log("Mean tests run")
+    
+    assoc_table_out, assoc_file, assoc_list = run_association_tests(group1, group2, s1 = args.sample1, s2 = args.sample2, confidence = args.confidence, alternative = args.alternative, distribution = args.distribution, norm_list = norm_list)
+    files_for_upload.append(assoc_file)
+    send_log("Association tests run")
+    
+    list_for_report = tests_list + norm_list + npara_list + mean_list + assoc_list
+    send_log(f"List for report: {list_for_report}")
+    pdf_out, figures = generate_pdf(list_for_report)
+    files_for_upload = files_for_upload + pdf_out
+    
+    send_log(f"Files for upload: {files_for_upload}")
+    json_string = json.dumps(files_for_upload)
+    with open("/app/results_for_upload.json", "w") as outfile:
+        outfile.write(json_string)
+        
+    response_dict = generate_output_json(stat_tables_out, stat_plots_out, norm_table_out, npara_table_out, mean_table_out, assoc_table_out, figures)
+    send_log(f"Response dict: {response_dict}")
+    json_string2 = json.dumps(response_dict)
+    with open("/app/results_for_payload.json", "w") as outfile:
+        outfile.write(json_string2)

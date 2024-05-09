@@ -20,6 +20,7 @@ def _process_stage(stage_name, stage_value, config):
     for key, value in config['input_files'].items():
         sub_process_list.append("--" + key)
         sub_process_list.append(str(value))
+    logging.info(sub_process_list)
     process = subprocess.Popen(sub_process_list, stdout=subprocess.PIPE)
     while True:
         line = process.stdout.readline()
@@ -48,14 +49,14 @@ def _upload_results(job_id: str):
     else:
         logging.info("Generating payload from yaml file")
         results_for_payload, results_for_upload = payload_from_yaml('/app/workflow.yml')
-    results_for_payload = remove_empty_keys(results_for_payload)
+    #results_for_payload = remove_empty_keys(results_for_payload)
     
     #upload results
     logging.info('Payload:')
     logging.info(results_for_payload)
 
-    AppRunnerUtils.upload_results(job_id, results_for_payload)
-    logging.info('Additional artifacts:')
+    #AppRunnerUtils.upload_results(job_id, results_for_payload)
+    logging.info('Uploading artifacts:')
     logging.info(results_for_upload)
     for element in results_for_upload:
         AppRunnerUtils.upload_file(job_id, element)

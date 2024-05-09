@@ -3,3 +3,9 @@ pandas
 numpy
 scipy
 matplotlib
+
+#report requirements
+reportlab
+Pillow
+openai==0.28
+boto3

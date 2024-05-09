@@ -24,12 +24,15 @@ RUN pip install --upgrade pip
 RUN mkdir -p /app/
 COPY requirements.txt /app/requirements.txt
 RUN pip install -r /app/requirements.txt
-COPY app/ /app/
-RUN mkdir -p /data/
+RUN pip install git+https://github.com/Superbio-ai/app-sbioutils
 
-COPY application.py .
+COPY app/ /app/
+COPY application.py /app/application.py
+COPY app_runner.py app_runner.py
+RUN mkdir -p /data/
+RUN mkdir -p /outputs/
 
 #EXPOSE 8000
 #ENTRYPOINT ["python","application.py"]
 
-ENTRYPOINT python /app/app_runner.py ${JOB_ID}
+ENTRYPOINT python app_runner.py ${JOB_ID}

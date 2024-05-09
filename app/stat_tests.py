@@ -2,9 +2,10 @@ import pandas as pd
 import numpy as np
 from scipy import stats
 import matplotlib.pyplot as plt
+from report import interpret_tests
 
 
-def run_normal_tests(group1, group2, s1, s2, alternative = 'two-sided', output = "/output/"):
+def run_normal_tests(group1, group2, s1, s2, confidence, alternative = 'two-sided', output = "outputs/"):
     
     metrics_out1 = []
     index_out1 = ['Shapiro','Skew']
@@ -52,17 +53,24 @@ def run_normal_tests(group1, group2, s1, s2, alternative = 'two-sided', output =
         )
         
         norm_concat.to_csv(output + 'Normal_Tests.csv')
+        test_list = [{'description':'Tests for Normality', 'type':'header'}]
+        test_list.append({'object': norm_concat, 'type':'table'})
+        test_list.append({'object':interpret_tests(norm_concat, confidence), 'type': 'interpretation'})
         
     else:
         norm_metrics1.to_csv(output + 'Normal_Tests.csv')
+        test_list = [{'description':'Tests for Normality', 'type':'header'}]
+        test_list.append({'object': norm_metrics1, 'type':'table'})
+        test_list.append({'object':interpret_tests(norm_metrics1, confidence), 'type': 'interpretation'})
     
     norm_table_out = [{'file': output + 'Normal_Tests.csv',
                        'title': 'Normal Tests'}]
-    return norm_table_out
+    
+    return norm_table_out, output + 'Normal_Tests.csv', test_list
     
     
     #THIS NEEDS S2
-def run_nonparametric_tests(group1, group2, s1, s2, alternative = 'two-sided', output = "/output/"):
+def run_nonparametric_tests(group1, group2, s1, s2, confidence, alternative = 'two-sided', output = "outputs/"):
     
     metrics_out = []
     index_out = ['Mann-Whitney','Wilcoxon Rank-Sum',
@@ -85,15 +93,20 @@ def run_nonparametric_tests(group1, group2, s1, s2, alternative = 'two-sided', o
     ansari = stats.ansari(group1, group2, alternative = alternative)
     metrics_out.append((ansari.statistic,ansari.pvalue))
     metrics_df = pd.DataFrame(metrics_out, index = index_out)
+    metrics_df.columns = ['statistic','pvalue']
     metrics_df.to_csv(output + 'Non_Parametric_Tests.csv')
     
     npara_table_out = [{'file': output + 'Non_Parametric_Tests.csv',
                        'title': 'Non-Parametric Tests'}]
-    return npara_table_out
+    test_list = [{'description':'Non-Parametric Tests', 'type':'header'}]
+    test_list.append({'object': metrics_df, 'type':'table'})
+    test_list.append({'object':interpret_tests(metrics_df, confidence), 'type': 'interpretation'})
+    
+    return npara_table_out, output + 'Non_Parametric_Tests.csv', test_list
 
     
     #THIS NEEDS S2 (but see 1 sample t-test and see 3+ sample anova)
-def run_mean_tests(group1, group2, s1, s2, alternative = 'two-sided', output = "/output/"):
+def run_mean_tests(group1, group2, s1, s2, confidence, alternative = 'two-sided', output = "outputs/"):
     
     metrics_out = []
     index_out = ['T-Test','Wilcoxon','BWS Test']
@@ -116,33 +129,41 @@ def run_mean_tests(group1, group2, s1, s2, alternative = 'two-sided', output = "
     
     mean_table_out = [{'file': output + 'Mean_Tests.csv',
                        'title': 'Mean Tests'}]
-    return mean_table_out
+    test_list = [{'description':'Distribution Tests', 'type':'header'}]
+    test_list.append({'object': metrics_df, 'type':'table'})
+    test_list.append({'object':interpret_tests(metrics_df, confidence), 'type': 'interpretation'})
+    
+    return mean_table_out, output + 'Mean_Tests.csv', test_list
 
     
-def run_association_tests(group1, group2, s1, s2, alternative = 'two-sided', distribution = 'non-parametric', output = "/output/"):
+def run_association_tests(group1, group2, s1, s2, confidence, alternative = 'two-sided', distribution = 'non-parametric', output = "outputs/", norm_list = [{'object':''}]):
     
     metrics_out = []
     
-    if distribution == 'normal':
-        index_out = ['Pearson R','Linear Regression']
-        metrics_out.append(stats.pearsonr(group1, group2, alternative = alternative))
-        lr_metrics = stats.linregress(group1, group2, alternative = alternative)
-        metrics_out.append((lr_metrics[2], lr_metrics[3]))
+    index_out = ['Pearson R'] #,'Linear Regression']
+    metrics_out.append(stats.pearsonr(group1, group2, alternative = alternative))
+    #lr_metrics = stats.linregress(group1, group2, alternative = alternative)
+    #metrics_out.append((lr_metrics[2], lr_metrics[3]))
     
-    elif distribution == 'non-parametric':
-        index_out = ['Spearman R'] #,'Siegel Slopes','Thiel Slopes']
-        metrics_out.append(stats.spearmanr(group1, group2, alternative = alternative))
-        #metrics_out.append(stats.siegelslopes(group1, group2, alternative = alternative))   #like linear regression, but ignores outliers
-        #metrics_out.append(stats.thielslopes(group1, group2, alternative = alternative))   #fits pairwise slopes
+    index_out.append('Spearman R') #,'Siegel Slopes','Thiel Slopes']
+    metrics_out.append(stats.spearmanr(group1, group2, alternative = alternative))
+    #metrics_out.append(stats.siegelslopes(group1, group2, alternative = alternative))   #like linear regression, but ignores outliers
+    #metrics_out.append(stats.thielslopes(group1, group2, alternative = alternative))   #fits pairwise slopes
     
-    elif distribution == 'ordinal': #not used in version 1
-        index_out = ['Kendall Tau','Somers D']
-        metrics_out.append(stats.kendalltau(group1, group2, alternative = alternative))
-        metrics_out.append(stats.somersd(group1, group2, alternative = alternative))
+    index_out.append('Kendall Tau')
+    index_out.append('Somers D')
+    metrics_out.append(stats.kendalltau(group1, group2, alternative = alternative))
+    sd = stats.somersd(group1, group2, alternative = alternative)
+    metrics_out.append((sd.statistic,sd.pvalue))
 
     metrics_df = pd.DataFrame(metrics_out, index = index_out)
     metrics_df.to_csv(output + 'Association_Tests.csv')
     
     assoc_table_out = [{'file': output + 'Association_Tests.csv',
                        'title': 'Association Tests'}]
-    return assoc_table_out
+    test_list = [{'description':'Association Tests', 'type':'header'}]
+    test_list.append({'object': metrics_df, 'type':'table'})
+    print(norm_list)
+    test_list.append({'object':interpret_tests(metrics_df, confidence, distribution, norm_list[-1]['object']), 'type': 'interpretation'})
+    
+    return assoc_table_out, output + 'Association_Tests.csv', test_list
